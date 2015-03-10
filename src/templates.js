@@ -30,13 +30,17 @@ templates["window.hbs"] = Handlebars.template({"1":function(depth0,helpers,parti
     + escapeExpression(((helper = (helper = helpers.address || (depth0 != null ? depth0.address : depth0)) != null ? helper : helperMissing),(typeof helper === functionType ? helper.call(depth0, {"name":"address","hash":{},"data":data}) : helper)))
     + "</li>\n";
 },"4":function(depth0,helpers,partials,data) {
+  return "        <div>\n            Adding a lot for the lots you have drawn.\n        </div>\n";
+  },"6":function(depth0,helpers,partials,data) {
   return "disabled";
   },"compiler":[6,">= 2.0.0-beta.1"],"main":function(depth0,helpers,partials,data) {
   var stack1, buffer = "<div class=\"map-add-lot-mode-container\">\n    <h1>You are in add-a-lot mode</h1>\n    <div class=\"map-add-lot-zoom-message\">Zoom in to see parcel outlines</div>\n    <div>\n        Currently over:\n        <span class=\"map-add-lot-current-parcel\"></span>\n    </div>\n";
   stack1 = helpers['if'].call(depth0, (depth0 != null ? depth0.parcels : depth0), {"name":"if","hash":{},"fn":this.program(1, data),"inverse":this.noop,"data":data});
   if (stack1 != null) { buffer += stack1; }
-  buffer += "    <div class=\"map-add-lot-actions\">\n        <a href=\"#\" class=\"add-lot-mode-cancel btn btn-default\">cancel</a>\n        <a href=\"#\" class=\"add-lot-mode-submit btn btn-default ";
-  stack1 = helpers.unless.call(depth0, (depth0 != null ? depth0.parcels : depth0), {"name":"unless","hash":{},"fn":this.program(4, data),"inverse":this.noop,"data":data});
+  stack1 = helpers['if'].call(depth0, (depth0 != null ? depth0.drawnLots : depth0), {"name":"if","hash":{},"fn":this.program(4, data),"inverse":this.noop,"data":data});
+  if (stack1 != null) { buffer += stack1; }
+  buffer += "    <div class=\"map-add-lot-actions\">\n        <a href=\"#\" class=\"add-lot-mode-cancel btn btn-default\">cancel</a>\n        <a href=\"#\" class=\"add-lot-mode-draw btn btn-default\">draw lot</a>\n        <a href=\"#\" class=\"add-lot-mode-submit btn btn-default ";
+  stack1 = helpers.unless.call(depth0, (depth0 != null ? depth0.canSubmit : depth0), {"name":"unless","hash":{},"fn":this.program(6, data),"inverse":this.noop,"data":data});
   if (stack1 != null) { buffer += stack1; }
   return buffer + "\">add lot</a>\n    </div>\n</div>\n";
 },"useData":true});

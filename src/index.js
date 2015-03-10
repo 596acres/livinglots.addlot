@@ -3,6 +3,7 @@ var Handlebars = require('handlebars');
 var _ = require('underscore');
 var Spinner = require('spin.js');
 
+require('leaflet-draw');
 require('livinglots.parcels');
 
 var templates = require('./templates')(Handlebars);
@@ -19,7 +20,31 @@ var parcelSelectStyle = {
 };
 
 var cancelButtonSelector = '.add-lot-mode-cancel',
+    drawButtonSelector = '.add-lot-mode-draw',
     submitButtonSelector = '.add-lot-mode-submit';
+
+var drawControlVisible = false,
+    drawControlOptions = {
+        position: 'topright',
+        draw: {
+            circle: false,
+            marker: false,
+            polygon: {
+                allowIntersection: false,
+                drawError: {
+                    color: '#e1e100',
+                    message: 'This would not be a valid shape!'
+                },
+                shapeOptions: {
+                    color: '#1f9e48',
+                    opacity: 0.8
+                }
+            },
+            polyline: false,
+            rectangle: false
+        }
+    };
+
 
 L.Map.include({
 
@@ -69,56 +94,39 @@ L.Map.include({
 
     },
 
+    enterDrawLotMode: function () {
+        if (drawControlVisible) { return; }
+        if (this._drawControl) {
+            this.addControl(this._drawControl);
+            this.addLayer(this._drawnLots);
+            drawControlVisible = true;
+            return;
+        }
+
+        drawControlOptions.edit = {
+            featureGroup: this._drawnLots
+        };
+        this._drawControl = new L.Control.Draw(drawControlOptions);
+        this.addControl(this._drawControl);
+        drawControlVisible = true;
+    },
+
+    removeDrawControl: function () {
+        if (!drawControlVisible) { return; }
+        drawControlVisible = false;
+        this.removeControl(this._drawControl);
+        this.removeLayer(this._drawnLots);
+    },
+
     enterLotAddMode: function () {
         var map = this;
         this.addParcelsLayer();
+        this._drawnLots = L.featureGroup().addTo(this);
         this.updateLotAddWindow();
         this.fire('entermode', { name: 'addlot' });
         this.lotAddZoomHandler();
 
-        this.on('zoomend', this.lotAddZoomHandler);
-
         $(this.options.addLotParent).addClass('on');
-
-        this.on('entermode', function (data) {
-            if (data.name !== 'addlot') {
-                map.exitLotAddMode();
-            }
-        });
-
-        $('body').on('click', cancelButtonSelector, function (e) {
-            map.selectedParcels = [];
-            map.exitLotAddMode();
-            e.stopPropagation();
-            return false;
-        });
-
-        $('body').on('click', submitButtonSelector, function (e) {
-            var parcelPks = _.pluck(map.selectedParcels, 'id');
-            if (parcelPks.length > 0 && confirm('Create one lot with all of the parcels selected?')) {
-                var spinner = new Spinner()
-                    .spin($('.map-add-lot-mode-container')[0]);
-                $(cancelButtonSelector).addClass('disabled');
-                $(submitButtonSelector).addClass('disabled');
-
-                args = {
-                    csrfmiddlewaretoken: Django.csrf_token(),
-                    pks: parcelPks.join(',')
-                };
-                $.post(Django.url('lots:create_by_parcels'), args)
-                    .always(function () {
-                        spinner.stop();
-                    })
-                    .done(function (data) {
-                        map.updateLotAddWindowSuccess(data);
-                    })
-                    .fail(function() {
-                        map.updateLotAddWindowFailure();
-                    });
-            }
-            e.stopPropagation();
-            return false;
-        });
     },
 
     lotAddZoomHandler: function () {
@@ -142,9 +150,49 @@ L.Map.include({
         this.fire('lotaddwindowchange');
     },
 
+    submitLotAdd: function () {
+        var parcelPks = _.pluck(this.selectedParcels, 'id'),
+            spinner = new Spinner().spin($('.map-add-lot-mode-container')[0]),
+            args = {
+                csrfmiddlewaretoken: Django.csrf_token(),
+            },
+            map = this,
+            url = null;
+
+        if (parcelPks.length > 0 && confirm('Create one lot with all of the parcels selected?')) {
+            args.pks = parcelPks.join(',');
+            url = Django.url('lots:create_by_parcels');
+        }
+        else if (this._drawnLots.getLayers().length > 0 && confirm("Create one lot with the parcels you've drawn?")) {
+            args.geom = JSON.stringify(this._drawnLots.toGeoJSON());
+            url = Django.url('lots:create_by_geom');
+        }
+
+        if (url) {
+            $(cancelButtonSelector).addClass('disabled');
+            $(drawButtonSelector).addClass('disabled');
+            $(submitButtonSelector).addClass('disabled');
+
+            $.post(url, args)
+                .always(function () {
+                    spinner.stop();
+                })
+                .done(function (data) {
+                    map.updateLotAddWindowSuccess(data);
+                })
+                .fail(function() {
+                    map.updateLotAddWindowFailure();
+                });
+        }
+    },
+
     updateLotAddWindow: function () {
+        var drawnLots = this._drawnLots.getLayers().length > 0,
+            parcels = this.selectedParcels;
         this.replaceLotAddWindowContent(templates['window.hbs']({
-            parcels: this.selectedParcels
+            canSubmit: drawnLots || (parcels.length > 0),
+            drawnLots: drawnLots,
+            parcels: parcels
         }));
     },
 
@@ -177,7 +225,45 @@ L.Map.include({
         this.fire('exitmode', { name: 'addlot' });
         $('.map-add-lot-mode-container').hide();
         this.off('zoomend', this.lotAddZoomHandler);
-        this.removeLayer(this.parcelsLayer);
+        this.removeParcelsLayer();
+        this.removeDrawControl();
     }
 
+});
+
+
+// Add events to map
+L.Map.addInitHook(function () {
+    this.on('draw:created', function (e) {
+        this._drawnLots.addLayer(e.layer);
+        this.updateLotAddWindow();
+    }, this);
+
+    this.on('zoomend', this.lotAddZoomHandler);
+
+    this.on('entermode', function (data) {
+        if (data.name !== 'addlot') {
+            map.exitLotAddMode();
+        }
+    });
+
+    var map = this;
+    $('body').on('click', cancelButtonSelector, function (e) {
+        map.selectedParcels = [];
+        map.exitLotAddMode();
+        e.stopPropagation();
+        return false;
+    });
+
+    $('body').on('click', drawButtonSelector, function (e) {
+        map.enterDrawLotMode();
+        e.stopPropagation();
+        return false;
+    });
+
+    $('body').on('click', submitButtonSelector, function (e) {
+        map.submitLotAdd();
+        e.stopPropagation();
+        return false;
+    });
 });
