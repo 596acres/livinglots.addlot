@@ -47,52 +47,7 @@ var drawControlVisible = false,
 
 
 L.Map.include({
-
     selectedParcels: [],
-
-    parcelLayerOptions: {
-
-        onEachFeature: function (feature, layer) {
-            layer.on({
-                'click': function (event) {
-                    var map = this._map,
-                        layer = event.layer,
-                        feature = event.target.feature;
-                    if (_.findWhere(map.selectedParcels, { id: feature.id })) {
-                        map.selectedParcels = _.reject(map.selectedParcels, function (p) {
-                            return p.id === feature.id;
-                        });
-                        layer.setStyle(parcelDefaultStyle);
-                    }
-                    else {
-                        $.get(Django.url('lots:create_by_parcels_check_parcel', { pk: feature.id }))
-                            .success(function(data) {
-                                if (data !== 'None') {
-                                    map.createLotExistsPopup(event.latlng, data);
-                                }
-                            });
-                        map.selectedParcels.push({
-                            id: feature.id,
-                            address: feature.properties.address
-                        });
-                        layer.setStyle(parcelSelectStyle);
-                    }
-                    map.updateLotAddWindow();
-                },
-
-                'mouseover': function (event) {
-                    var layer = event.layer,
-                        feature = event.target.feature;
-                    $('.map-add-lot-current-parcel').text(feature.properties.address);
-                }
-            });
-        },
-
-        style: function (feature) {
-            return parcelDefaultStyle;
-        },
-
-    },
 
     enterDrawLotMode: function () {
         if (drawControlVisible) { return; }
@@ -199,7 +154,8 @@ L.Map.include({
     updateLotAddWindowSuccess: function (pk) {
         var map = this;
         this.replaceLotAddWindowContent(templates['success.hbs']({
-            pk: pk
+            pk: pk,
+            successMessage: map.options.addLotSuccessMessage
         }));
 
         $('.add-lot-mode-view')
@@ -246,6 +202,32 @@ L.Map.addInitHook(function () {
             map.exitLotAddMode();
         }
     });
+
+    this.on('parcels.select', (function (event) {
+        var map = this,
+            layer = event.layer,
+            feature = event.feature;
+        if (_.findWhere(map.selectedParcels, { id: feature.id })) {
+            map.selectedParcels = _.reject(map.selectedParcels, function (p) {
+                return p.id === feature.id;
+            });
+            layer.setStyle(parcelDefaultStyle);
+        }
+        else {
+            $.get(Django.url('lots:create_by_parcels_check_parcel', { pk: feature.id }))
+                .success(function(data) {
+                    if (data !== 'None') {
+                        map.createLotExistsPopup(event.latlng, data);
+                    }
+                });
+            map.selectedParcels.push({
+                id: feature.id,
+                address: feature.properties.address
+            });
+            layer.setStyle(parcelSelectStyle);
+        }
+        map.updateLotAddWindow();
+    }).bind(this));
 
     var map = this;
     $('body').on('click', cancelButtonSelector, function (e) {

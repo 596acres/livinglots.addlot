@@ -4,7 +4,6 @@ module.exports = function(grunt) {
             compile: {
                 options: {
                     commonjs: true,
-                    namespace: false,
                     processName: function (filename) {
                         return filename.split('/').slice(-1).join('.');
                     }
