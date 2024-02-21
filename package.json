@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "dependencies": {
     "leaflet-draw": "^0.2.3",
-    "livinglots.parcels": "git://github.com/596acres/livinglots.parcels"
+    "livinglots.parcels": "git+https://github.com/596acres/livinglots.parcels"
   },
   "repository": {
     "type": "git",
