@@ -4,7 +4,7 @@
   "description": "Living Lots addlot",
   "main": "src/index.js",
   "dependencies": {
-    "leaflet-draw": "^0.2.3",
+    "leaflet-draw": "^1.0.0",
     "livinglots.parcels": "git+https://github.com/596acres/livinglots.parcels"
   },
   "repository": {
